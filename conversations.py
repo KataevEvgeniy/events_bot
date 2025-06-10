@@ -7,6 +7,7 @@ from telegram.ext import ConversationHandler, filters, MessageHandler, ContextTy
 import database
 import menus
 import post_apocalypse_test
+import store
 
 #-----------------------------------------------------------------------------------------------------------------------
 # POST APOCALYPSE QUIZ CONVERSATION
@@ -75,11 +76,13 @@ async def finish_quiz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = database.get_user(telegram_id)
     stars_text = ""
     if not user.is_apocalypse_quiz_complete:
-        database.update_user(user.telegram_id,user.is_admin,user.count_stars + 3,True)
+        final_count = store.add_stars(telegram_id, 3)
+        database.update_user(telegram_id, user.is_admin, final_count, True)
         stars_text = (
             f"🎉 Вы прошли тест и получили *3 звезды!*\n"
-            f"⭐ Текущий рейтинг: {user.count_stars + 3} звёзд"
+            f"⭐ Текущий рейтинг: {final_count} звёзд"
         )
+
 
 
 

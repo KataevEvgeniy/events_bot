@@ -1,3 +1,4 @@
+import asyncio
 import random
 import string
 
@@ -6,6 +7,7 @@ from telegram.ext import ContextTypes
 
 import database
 import messages
+import store
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -74,10 +76,9 @@ async def main_menu_button_handler(update: Update, context: ContextTypes.DEFAULT
 def possibilities_menu_keyboard():
     keyboard = [
         [InlineKeyboardButton('🎯 Квиз "Твоя специальность"', callback_data='start_quiz')],
-        [InlineKeyboardButton('📚 Викторина о колледже', callback_data='possibilities_college_quiz')],
-        [InlineKeyboardButton('🔓 Открой секреты колледжа', callback_data='possibilities_secrets')],
         [InlineKeyboardButton('📸 Отсканируй QR-коды и получи приз', callback_data='possibilities_qr_quest')],
         [InlineKeyboardButton('🎰 Рулетка на призы', callback_data='possibilities_roulette')]
+        # [InlineKeyboardButton('📚 Викторина о колледже', callback_data='possibilities_college_quiz')], #TODO: Создать вопросы как в квизе выше, но про колледж и исходя из qr кодов
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -99,12 +100,17 @@ async def possibilities_menu_button_handler(update: Update, context: ContextType
 
     if data == 'possibilities_college_quiz':
         await query.edit_message_text("📚 Викторина о колледже скоро начнётся!")
-    elif data == 'possibilities_secrets':
-        await query.edit_message_text("🔓 Секрет колледжа: наши студенты побеждают на олимпиадах каждый год!")
     elif data == 'possibilities_qr_quest':
-        await query.edit_message_text("📸 Отсканируйте все QR-коды на мероприятии и получите подарок!")
+        await query.edit_message_text(
+            "🎯 *Задание для тебя!*\n\n"
+            "📸 Прогуляйся по мероприятию, отсканируй все QR-коды и познакомься с историей колледжа!\n"
+            "🎁 Когда справишься — тебя ждёт викторина и шанс получить *много звезд*! 💥\n"
+            "👍 Их можно обменять на ценные призы!",
+            parse_mode="Markdown",
+            reply_markup=back_keyboard("possibilities_menu")
+        )
     elif data == 'possibilities_roulette':
-        await query.edit_message_text("🎰 Запусти рулетку и выиграй призы! Попытка доступна каждые 5 минут.")
+        await dice_menu(update,context)
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -186,6 +192,66 @@ async def admin_menu_button_handler(update: Update, context: ContextTypes.DEFAUL
 
     if data == 'admin_qr':
         await messages.qr_article_links(query)
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+# DICE MENU
+#-----------------------------------------------------------------------------------------------------------------------
+
+def dice_menu_keyboard(is_free:bool):
+    keyboard = [
+        [InlineKeyboardButton(f"🎰 Испытать удачу {'бесплатно' if is_free else '1 ⭐'}", callback_data="dice_throw")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+async def dice_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = database.get_user(update.effective_user.id)
+    if update.message:
+        await update.message.reply_text("Испытай свою удачу и выиграй приз", reply_markup=dice_menu_keyboard(user.free_spin))
+    elif update.callback_query:
+        query = update.callback_query
+        await query.edit_message_text("Испытай свою удачу и выиграй приз", reply_markup=dice_menu_keyboard(user.free_spin))
+
+async def dice_menu_button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+
+    if query.data == 'dice_throw':
+        telegram_id = update.effective_user.id
+
+
+        user = database.get_user(telegram_id)
+        if not user.free_spin:
+            if user.count_stars == 0:
+                await query.answer("Недостаточно звёзд 😕", show_alert=True)
+                return
+            else:
+                store.remove_stars(telegram_id, 1)
+        else:
+            database.update_user(telegram_id, user.is_admin, user.count_stars, user.is_apocalypse_quiz_complete, False)
+
+        data = await query.message.reply_dice(emoji="🎰")
+
+        await asyncio.sleep(3)
+
+        # Расшифровка значения
+        value = data.dice.value
+
+
+        if value == 64:
+            store.add_stars(telegram_id, 7)
+            await query.message.reply_text("🎉 Поздравляем! Вы выиграли 7 ⭐ звёзд! Выпало 777! 🎰",reply_markup=dice_menu_keyboard(False))
+        elif value in {16, 32, 48}:
+            store.add_stars(telegram_id, 3)
+            await query.message.reply_text("🎉 Поздравляем! Вы выиграли 3 ⭐ звезды! Первые две семёрки!",reply_markup=dice_menu_keyboard(False))
+        elif value in {1, 22, 43}:
+            store.add_stars(telegram_id, 3)
+            await query.message.reply_text("🎉 Поздравляем! Вы выиграли 3 ⭐ звезды! Выпало три одинаковых символа!",reply_markup=dice_menu_keyboard(False))
+        else:
+            await query.message.reply_text(f"Не повезло!",reply_markup=dice_menu_keyboard(False))
+
+        # Закрываем индикатор загрузки кнопки
+        await query.answer()
+
 
 #-----------------------------------------------------------------------------------------------------------------------
 # MODULAR KEYBOARD

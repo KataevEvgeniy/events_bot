@@ -26,6 +26,7 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     count_stars = Column(Integer, default=0)
     is_apocalypse_quiz_complete = Column(Boolean, default=False)
+    free_spin = Column(Boolean, default=False)
 
     def __repr__(self):
         return f"<User(telegram_id={self.telegram_id}, is_admin={self.is_admin}, count_stars={self.count_stars})>"
@@ -40,16 +41,16 @@ def init_db():
 # USER CRUD
 #-----------------------------------------------------------------------------------------------------------------------
 
-def add_user(telegram_id: int, is_admin=False, count_stars=0,is_apocalypse_quiz_complete=False):
+def add_user(telegram_id: int, is_admin=False, count_stars=0,is_apocalypse_quiz_complete=False,free_spin=True):
     session = Session()
     existing = session.query(User).filter_by(telegram_id=telegram_id).first()
     if not existing:
-        user = User(telegram_id=telegram_id, is_admin=is_admin, count_stars=count_stars,is_apocalypse_quiz_complete = is_apocalypse_quiz_complete)
+        user = User(telegram_id=telegram_id, is_admin=is_admin, count_stars=count_stars,is_apocalypse_quiz_complete = is_apocalypse_quiz_complete,free_spin=free_spin)
         session.add(user)
         session.commit()
     session.close()
 
-def update_user(telegram_id: int, is_admin=None, count_stars=None,is_apocalypse_quiz_complete=None):
+def update_user(telegram_id: int, is_admin=None, count_stars=None,is_apocalypse_quiz_complete=None,free_spin=None):
     session = Session()
     user = session.query(User).filter_by(telegram_id=telegram_id).first()
     if user:
@@ -59,6 +60,8 @@ def update_user(telegram_id: int, is_admin=None, count_stars=None,is_apocalypse_
             user.count_stars = count_stars
         if count_stars is not None:
             user.is_apocalypse_quiz_complete = is_apocalypse_quiz_complete
+        if free_spin is not None:
+            user.free_spin = free_spin
         session.commit()
     session.close()
 
