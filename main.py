@@ -1,5 +1,6 @@
 import json
 import re
+from collections import Counter
 
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
@@ -12,12 +13,14 @@ from conversations import quiz_conversation
 BOT_TOKEN = "7251803941:AAE0zAGT-1Aq2xa1VtVsO7MpdgWD_V5ved8"
 
 functions = {}
+start_func_name = ""
 
-def build_buttons(buttons_data):
+def build_buttons(data):
     # buttons_data — список словарей с кнопками из JSON
     keyboard = []
-    for btn in buttons_data:
-        # Кнопка с текстом и callback_data или URL (зависит от задачи)
+    for btn in data["args"].get("buttons"):
+
+         # Кнопка с текстом и callback_data или URL (зависит от задачи)
         keyboard.append([InlineKeyboardButton(text=btn["text"], callback_data=btn.get("function"))])
     return InlineKeyboardMarkup(keyboard)
 
@@ -27,9 +30,17 @@ def high_level_function_parser(app, data):
         args = data["args"]
         get_type = args["type"].lower()
 
+        # if get_type == "start_param":
+        #     functions[args["request_func"]
+
         # Обработка команды /command
         if get_type == "command":
-            app.add_handler(CommandHandler(args["commandName"], functions[args["requestFunc"]]))
+            if args["commandName"] == "start":
+                global start_func_name
+                start_func_name = args["requestFunc"]
+
+            else:
+                app.add_handler(CommandHandler(args["commandName"], functions[args["requestFunc"]]))
 
         # Обработка callback по шаблону
         elif get_type == "callback":
@@ -43,7 +54,7 @@ def high_level_function_parser(app, data):
         # Текстовые сообщения с кнопками
         if msg_type == "text":
             buttons = args.get("buttons")
-            reply_markup = build_buttons(buttons) if buttons else None
+            reply_markup = build_buttons(data) if buttons else None
 
             async def send_text(update, context):
                 if update.message:
@@ -69,41 +80,80 @@ def high_level_function_parser(app, data):
             functions[data["name"]] = send_image
 
 
-
-
 def main():
     database.init_db()
-
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     with open("C:\\Users\\jackm\\Documents\\config.json", 'r', encoding='utf-8') as f:
         config = json.load(f)
 
+        for test in config["tests"]:
+            async def start(update, context):
+                start_markup = InlineKeyboardMarkup([[InlineKeyboardButton(text="Начать", callback_data=test["name"] + "_next")]])
+
+                context.user_data[test["name"]] = {
+                    "questions": 1,
+                    "answers": [],
+                    "current": 0
+                }
+
+                if update.message:
+                    await update.message.reply_text(test["welcome_text"], reply_markup=start_markup)
+                elif update.callback_query:
+                    await update.callback_query.answer()  # необязательно, но желательно
+                    await update.callback_query.edit_message_text(test["welcome_text"], reply_markup=start_markup)
+
+            functions[test["name"] + "_start"] = start
+
+            app.add_handler(CallbackQueryHandler(functions[test["name"] + "_start"], pattern=test["name"] + "_start"))
+
+            async def next(update, context):
+                await update.callback_query.answer()
+                splitted = update.callback_query.data.split(":")
+                if len(splitted) > 1:
+                    answer_code = splitted[1]
+                    context.user_data[test["name"]]["answers"].append(answer_code)
+                current = context.user_data[test["name"]]["current"]
+                current += 1
+                context.user_data[test["name"]]["current"] = current
+
+                if current > len(test["questions"]):
+                    answers = context.user_data[test["name"]]["answers"]
+                    most_common = Counter(answers).most_common(1)[0][0]
+                    result_text = test["results"].get(most_common, "Что-то пошло не так 😅")
+
+                    finish_markup = InlineKeyboardMarkup(
+                        [[InlineKeyboardButton(text="Назад", callback_data=test["back_menu"])]])
+                    return await update.callback_query.edit_message_text(result_text + "\n"+ test["finish_text"], reply_markup=finish_markup)
+
+
+                question = test["questions"][current-1]
+
+                buttons = [
+                    [InlineKeyboardButton(option["text"], callback_data=test["name"]+ "_next" + ":" + option["key"])]
+                    for option in question["options"]
+                ]
+                markup = InlineKeyboardMarkup(buttons)
+
+                await update.callback_query.edit_message_text(question["question"], reply_markup=markup)
+
+            functions[test["name"] + "_next"] = next
+            app.add_handler(CallbackQueryHandler(functions[test["name"] + "_next"], pattern="^"+test["name"] + "_next"))
+
         for function in config["funcs"]:
             if function["abstraction"] == "high":
                 high_level_function_parser(app, function)
 
+    if start_func_name != "":
+        async def start(update, context):
+            if context.args:
+                param = context.args[0]
+                if param.startswith("qr_"):
+                    print(param)
+            else:
+                await functions[start_func_name](update, context)
 
-    # #Обработчики команд
-    # app.add_handler(CommandHandler('start', menus.main_menu))
-    # app.add_handler(CommandHandler('admin', menus.admin_menu))
-    #
-    # #Обработчики меню
-    # app.add_handler(CallbackQueryHandler(menus.main_menu_button_handler, pattern="^main_menu_"))
-    # app.add_handler(CallbackQueryHandler(menus.possibilities_menu_button_handler, pattern="^possibilities_"))
-    # app.add_handler(CallbackQueryHandler(menus.admin_menu_button_handler,pattern="^admin_"))
-    # app.add_handler(CallbackQueryHandler(menus.store_menu_button_handler,pattern="^store_"))
-    #
-    #
-    # #Обработчики кнопок модульного меню
-    # app.add_handler(CallbackQueryHandler(menus.back_keyboard_handler,pattern="^back_to_"))
-    #
-    #
-    # app.add_handler(CallbackQueryHandler(menus.dice_menu_button_handler, pattern="^dice_"))
-    #
-    # #Обработчики диалогов
-    # app.add_handler(quiz_conversation())
-
+        app.add_handler(CommandHandler('start', start))
 
     app.run_polling()
 
