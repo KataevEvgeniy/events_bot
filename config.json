@@ -1,0 +1,146 @@
+{
+	"funcs": [
+		{
+			"name": "Приветственное",
+			"abstraction": "high",
+			"type": "send",
+			"args": {
+				"type": "text",
+				"text": "Добро пожаловать в колледж",
+				"buttons": [
+					{
+						"text": "Расписание",
+						"function": "Расписание_callback"
+					},
+					{
+						"text": "О Колледже",
+						"function": "Информация о колледже_callback"
+					},
+					{
+						"text": "Пройти тес",
+						"function": "Тест_start"
+					}
+				]
+			}
+		},
+		{
+			"name": "Приветственное_callback",
+			"abstraction": "high",
+			"type": "get",
+			"args": {
+				"type": "callback",
+				"pattern": "^Приветственное_callback$",
+				"requestFunc": "Приветственное"
+			}
+		},
+		{
+			"name": "Приветственное_command",
+			"abstraction": "high",
+			"type": "get",
+			"args": {
+				"type": "command",
+				"commandName": "start",
+				"requestFunc": "Приветственное"
+			}
+		},
+		{
+			"name": "Информация о колледже",
+			"abstraction": "high",
+			"type": "send",
+			"args": {
+				"type": "text",
+				"text": "Это ЕЭТК",
+				"buttons": [
+					{
+						"text": "Назад",
+						"function": "Приветственное_callback"
+					}
+				]
+			}
+		},
+		{
+			"name": "Информация о колледже_callback",
+			"abstraction": "high",
+			"type": "get",
+			"args": {
+				"type": "callback",
+				"pattern": "^Информация о колледже_callback$",
+				"requestFunc": "Информация о колледже"
+			}
+		},
+		{
+			"name": "Расписание",
+			"abstraction": "high",
+			"type": "send",
+			"args": {
+				"type": "text",
+				"text": "Расписание",
+				"buttons": [
+					{
+						"text": "Назад",
+						"function": "Приветственное_callback"
+					}
+				]
+			}
+		},
+		{
+			"name": "Расписание_callback",
+			"abstraction": "high",
+			"type": "get",
+			"args": {
+				"type": "callback",
+				"pattern": "^Расписание_callback$",
+				"requestFunc": "Расписание"
+			}
+		}
+	],
+	"tests": [
+		{
+			"name": "Тест",
+			"welcome_text": "Привет",
+			"finish_text": "Пока",
+			"back_menu": "Приветственное_callback",
+			"results": {
+				"A": "Администратор выживания — ты ведёшь учёт, управляем ресурсами, планируешь.",
+				"B": " Порядочник — соблюдение правил и законов твоя миссия даже после катастрофы.",
+				"C": "Инженер выживания — ты можешь починить всё, кроме сломанной психики (пока)."
+			},
+			"questions": [
+				{
+					"question": "Ты очнулся в убежище после катастрофы. Что ты делаешь первым делом?",
+					"options": [
+						{
+							"key": "A",
+							"text": "Проверяю запасы и начинаю их учитывать"
+						},
+						{
+							"key": "B",
+							"text": "Напоминаю всем о правилах поведения"
+						},
+						{
+							"key": "C",
+							"text": "Слушаю, как работает техника — что-то не так"
+						}
+					]
+				},
+				{
+					"question": "Ты очнулся в убежище после катастрофы. Что ты делаешь первым делом?",
+					"options": [
+						{
+							"key": "A",
+							"text": "Проверяю запасы и начинаю их учитывать"
+						},
+						{
+							"key": "B",
+							"text": "Напоминаю всем о правилах поведения"
+						},
+						{
+							"key": "C",
+							"text": "Слушаю, как работает техника — что-то не так"
+						}
+					]
+				}
+			]
+		}
+	]
+}

@@ -84,61 +84,63 @@ def main():
     database.init_db()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    with open("C:\\Users\\jackm\\Documents\\config.json", 'r', encoding='utf-8') as f:
+    with open("config.json", 'r', encoding='utf-8') as f:
         config = json.load(f)
 
-        for test in config["tests"]:
-            async def start(update, context):
-                start_markup = InlineKeyboardMarkup([[InlineKeyboardButton(text="Начать", callback_data=test["name"] + "_next")]])
 
-                context.user_data[test["name"]] = {
-                    "questions": 1,
-                    "answers": [],
-                    "current": 0
-                }
+        if config.get("tests") is not None:
+            for test in config.get("tests"):
+                async def start(update, context):
+                    start_markup = InlineKeyboardMarkup([[InlineKeyboardButton(text="Начать", callback_data=test["name"] + "_next")]])
 
-                if update.message:
-                    await update.message.reply_text(test["welcome_text"], reply_markup=start_markup)
-                elif update.callback_query:
-                    await update.callback_query.answer()  # необязательно, но желательно
-                    await update.callback_query.edit_message_text(test["welcome_text"], reply_markup=start_markup)
+                    context.user_data[test["name"]] = {
+                        "questions": 1,
+                        "answers": [],
+                        "current": 0
+                    }
 
-            functions[test["name"] + "_start"] = start
+                    if update.message:
+                        await update.message.reply_text(test["welcome_text"], reply_markup=start_markup)
+                    elif update.callback_query:
+                        await update.callback_query.answer()  # необязательно, но желательно
+                        await update.callback_query.edit_message_text(test["welcome_text"], reply_markup=start_markup)
 
-            app.add_handler(CallbackQueryHandler(functions[test["name"] + "_start"], pattern=test["name"] + "_start"))
+                functions[test["name"] + "_start"] = start
 
-            async def next(update, context):
-                await update.callback_query.answer()
-                splitted = update.callback_query.data.split(":")
-                if len(splitted) > 1:
-                    answer_code = splitted[1]
-                    context.user_data[test["name"]]["answers"].append(answer_code)
-                current = context.user_data[test["name"]]["current"]
-                current += 1
-                context.user_data[test["name"]]["current"] = current
+                app.add_handler(CallbackQueryHandler(functions[test["name"] + "_start"], pattern=test["name"] + "_start"))
 
-                if current > len(test["questions"]):
-                    answers = context.user_data[test["name"]]["answers"]
-                    most_common = Counter(answers).most_common(1)[0][0]
-                    result_text = test["results"].get(most_common, "Что-то пошло не так 😅")
+                async def next(update, context):
+                    await update.callback_query.answer()
+                    splitted = update.callback_query.data.split(":")
+                    if len(splitted) > 1:
+                        answer_code = splitted[1]
+                        context.user_data[test["name"]]["answers"].append(answer_code)
+                    current = context.user_data[test["name"]]["current"]
+                    current += 1
+                    context.user_data[test["name"]]["current"] = current
 
-                    finish_markup = InlineKeyboardMarkup(
-                        [[InlineKeyboardButton(text="Назад", callback_data=test["back_menu"])]])
-                    return await update.callback_query.edit_message_text(result_text + "\n"+ test["finish_text"], reply_markup=finish_markup)
+                    if current > len(test["questions"]):
+                        answers = context.user_data[test["name"]]["answers"]
+                        most_common = Counter(answers).most_common(1)[0][0]
+                        result_text = test["results"].get(most_common, "Что-то пошло не так 😅")
+
+                        finish_markup = InlineKeyboardMarkup(
+                            [[InlineKeyboardButton(text="Назад", callback_data=test["back_menu"])]])
+                        return await update.callback_query.edit_message_text(result_text + "\n"+ test["finish_text"], reply_markup=finish_markup)
 
 
-                question = test["questions"][current-1]
+                    question = test["questions"][current-1]
 
-                buttons = [
-                    [InlineKeyboardButton(option["text"], callback_data=test["name"]+ "_next" + ":" + option["key"])]
-                    for option in question["options"]
-                ]
-                markup = InlineKeyboardMarkup(buttons)
+                    buttons = [
+                        [InlineKeyboardButton(option["text"], callback_data=test["name"]+ "_next" + ":" + option["key"])]
+                        for option in question["options"]
+                    ]
+                    markup = InlineKeyboardMarkup(buttons)
 
-                await update.callback_query.edit_message_text(question["question"], reply_markup=markup)
+                    await update.callback_query.edit_message_text(question["question"], reply_markup=markup)
 
-            functions[test["name"] + "_next"] = next
-            app.add_handler(CallbackQueryHandler(functions[test["name"] + "_next"], pattern="^"+test["name"] + "_next"))
+                functions[test["name"] + "_next"] = next
+                app.add_handler(CallbackQueryHandler(functions[test["name"] + "_next"], pattern="^"+test["name"] + "_next"))
 
         for function in config["funcs"]:
             if function["abstraction"] == "high":
